@@ -16,95 +16,116 @@
       </div>
       <async-task :asyncData='asyncData'></async-task>
     </div>
-    <div v-if='loading'>
-      Loading {{ loadingSeconds }} ...
-    </div>
-    <div v-else-if='loaded'>
-      <div class="alert alert-info">
-        <b>Help:</b>This page shows the state of the kafka cluster based on the optimized load calculation. Values before and after optimized load are shown respectively.
+
+    <div class="row">
+      <div class="col-2">
+        <div class="sticky-top" style="top:7em">
+          <h4>Hard goals</h4>
+          <div class="form-check" v-for="g in hardGoals" v-bind:key="g">
+            <input class="form-check-input" type="checkbox" :id="g" @click='updateTargetGoals(g, $event)' :checked="g.toLowerCase() !== 'RackAwareGoal'.toLowerCase()">
+            <label class="form-check-label" :for="g">{{ formatGoalName(g) }}</label>
+          </div>
+          <h4>Soft goals</h4>
+          <div class="form-check" v-for="g in softGoals" v-bind:key="g">
+            <input class="form-check-input" type="checkbox" :id="g" @click='updateTargetGoals(g, $event)'>
+            <label class="form-check-label" :for="g">{{ formatGoalName(g) }}</label>
+          </div>
+          <button class="btn btn-secondary" @click='getProposals()'>Refresh View</button>
+        </div>
       </div>
+      
+      <div class="col-8">
+        <div v-if='loading'>
+          Loading {{ loadingSeconds }} ...
+        </div>
+        <div v-else-if='loaded'>
+          <div class="alert alert-info">
+            <b>Help:</b>This page shows the state of the kafka cluster based on the optimized load calculation. Values before and after optimized load are shown respectively.
+          </div>
 
-      <h4>Proposal Changes</h4>
-      <table class="table table-sm table-bordered">
-        <thead class="thead-light">
-          <tr>
-            <th>Number of Replica Movements</th>
-            <th>Number of Leader Movements</th>
-            <th>Recent Windows</th>
-            <th>Data to Move (MB)</th>
-            <th>Monitored Partitions Coverage</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>{{ numReplicaMovements }}</td>
-            <td>{{ numLeaderMovements }}</td>
-            <td>{{ recentWindows }}</td>
-            <td>{{ dataToMoveMB }}</td>
-            <td>{{ monitoredPartitionsPercentage ? monitoredPartitionsPercentage.toFixed(2) : null }}%</td>
-          </tr>
-        </tbody>
-      </table>
+          <h4>Proposal Changes</h4>
+          <table class="table table-sm table-bordered">
+            <thead class="thead-light">
+              <tr>
+                <th>Number of Replica Movements</th>
+                <th>Number of Leader Movements</th>
+                <th>Recent Windows</th>
+                <th>Data to Move (MB)</th>
+                <th>Monitored Partitions Coverage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ numReplicaMovements }}</td>
+                <td>{{ numLeaderMovements }}</td>
+                <td>{{ recentWindows }}</td>
+                <td>{{ dataToMoveMB }}</td>
+                <td>{{ monitoredPartitionsPercentage ? monitoredPartitionsPercentage.toFixed(2) : null }}%</td>
+              </tr>
+            </tbody>
+          </table>
 
-      <h4>Optimized Load Difference - Per Broker</h4>
-      <table class="table table-sm table-bordered">
-        <thead class="thead-light">
-          <tr>
-            <th>Broker ID</th>
-            <th v-for="h in brokerLoad.heading">{{ h }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(brokerdata, brokerid) in brokerLoad.records">
-            <th>{{ brokerid }}</th>
-            <td v-for="h in brokerLoad.heading">
-              <diff-cell :head='h' :cell='brokerdata[h]' :showpct='showpct' />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+          <h4>Optimized Load Difference - Per Broker</h4>
+          <table class="table table-sm table-bordered">
+            <thead class="thead-light">
+              <tr>
+                <th>Broker ID</th>
+                <th v-for="h in brokerLoad.heading">{{ h }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(brokerdata, brokerid) in brokerLoad.records">
+                <th>{{ brokerid }}</th>
+                <td v-for="h in brokerLoad.heading">
+                  <diff-cell :head='h' :cell='brokerdata[h]' :showpct='showpct' />
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-      <h4>Optimized Load Difference - Per Host</h4>
-      <table class="table table-sm table-bordered">
-        <thead class="thead-light">
-          <tr>
-            <!-- <th>Host</th> -->
-            <th v-for="h in hostLoad.heading">{{ h }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(hostdata, host) in hostLoad.records">
-            <!-- <th>{{ host }}</th> -->
-            <td v-for="h in hostLoad.heading">
-              <diff-cell :head='h' :cell='hostdata[h]' :showpct='showpct' />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+          <h4>Optimized Load Difference - Per Host</h4>
+          <table class="table table-sm table-bordered">
+            <thead class="thead-light">
+              <tr>
+                <!-- <th>Host</th> -->
+                <th v-for="h in hostLoad.heading">{{ h }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(hostdata, host) in hostLoad.records">
+                <!-- <th>{{ host }}</th> -->
+                <td v-for="h in hostLoad.heading">
+                  <diff-cell :head='h' :cell='hostdata[h]' :showpct='showpct' />
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-      <h4>Goals</h4>
-      <table class="table table-sm table-bordered">
-        <thead class="thead-light">
-          <tr>
-            <th>Goal &amp; Goal Violation Details</th>
-            <th>Metadata</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr :key='goal.goal' v-for='goal in goals'>
-            <td>
-              <strong>{{ goal.goal }}</strong>
-              <br>
-              <!-- property renamed from goalViolated -> status upstream -->
-              <span v-if='goal.hasOwnProperty("goalViolated")'>{{ goal.goalViolated }}</span>
-              <span v-else>{{ goal.status }}</span>
-            </td>
-            <td>
-              <goal :goal='goal' />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+          <h4>Goals</h4>
+          <table class="table table-sm table-bordered">
+            <thead class="thead-light">
+              <tr>
+                <th>Goal &amp; Goal Violation Details</th>
+                <th>Metadata</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :key='goal.goal' v-for='goal in goals'>
+                <td>
+                  <strong>{{ goal.goal }}</strong>
+                  <br>
+                  <!-- property renamed from goalViolated -> status upstream -->
+                  <span v-if='goal.hasOwnProperty("goalViolated")'>{{ goal.goalViolated }}</span>
+                  <span v-else>{{ goal.status }}</span>
+                </td>
+                <td>
+                  <goal :goal='goal' />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -112,6 +133,7 @@
 <script>
 import DiffCell from '@/components/DiffCell'
 import Goal from '@/components/Goal'
+import Goals from '@/goals'
 
 export default {
   name: 'Proposals',
@@ -142,6 +164,8 @@ export default {
       loadBefore: {},
       loadAfter: {},
       goals: {},
+      allGoals: Goals,
+      selectedGoals: [],
       // show percentage diff
       showpct: false,
       showAsyncRefreshButton: false,
@@ -182,10 +206,20 @@ export default {
       })
       return newgoals
     },
+    hardGoals () {
+      return this.filterGoals(true)
+    },
+    softGoals () {
+      return this.filterGoals(false)
+    },
     url () {
       // loadBeforeOptimization is removed and is available only when
       // we pass verbose=true flag
-      return this.$helpers.getURL('proposals', {verbose: true})
+      let params = {verbose: true}
+      if (this.selectedGoals.length !== 0) {
+        params['goals'] = this.selectedGoals
+      }
+      return this.$helpers.getURL('proposals', params)
     },
     hostLoad () {
       let hostMap = [
@@ -369,6 +403,31 @@ export default {
         vm.goals = []
         vm.errorData = e && e.response && e.response.data ? e.response.data : e
       })
+    },
+    formatGoalName (goalName) {
+      let maxLength = 20
+      if (goalName.length > maxLength) {
+        return goalName.slice(0, maxLength) + '...'
+      } else {
+        return goalName
+      }
+    },
+    filterGoals (hardGoals) {
+      let targetGoals = []
+      for (let goal of this.allGoals.goals) {
+        if (goal.hardGoal === hardGoals) {
+          targetGoals.push(goal.goal)
+        }
+      }
+      return targetGoals
+    },
+    updateTargetGoals (goal, event) {
+      if (event.target.checked) {
+        this.selectedGoals.push(goal)
+      } else {
+        var index = this.selectedGoals.indexOf(goal)
+        this.selectedGoals.splice(index, 1)
+      }
     }
   }
 }
